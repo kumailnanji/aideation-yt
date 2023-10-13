@@ -6,30 +6,33 @@ import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  authDomain: "aideation-yt.firebaseapp.com",
-  projectId: "aideation-yt",
-  storageBucket: "aideation-yt.appspot.com",
-  messagingSenderId: "962348384448",
-  appId: "1:962348384448:web:e02758407aba3258d5ad25",
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 export const storage = getStorage(app);
 
-export async function uploadFileToFirebase(image_url: string, name: string) {
+export async function uploadFileToFirebase(file: File, note_id: string) {
   try {
-    const response = await fetch(image_url);
-    const buffer = await response.arrayBuffer();
-    const file_name = name.replace(" ", "") + Date.now + ".jpeg";
+    // Generate a unique filename for SVG
+    const file_name = note_id + ".svg"; // or any other desired naming convention
     const storageRef = ref(storage, file_name);
-    await uploadBytes(storageRef, buffer, {
-      contentType: "image/jpeg",
+
+    // Upload the File object directly
+    await uploadBytes(storageRef, file, {
+      contentType: "image/svg+xml",
     });
+
     const firebase_url = await getDownloadURL(storageRef);
     return firebase_url;
   } catch (error) {
     console.error(error);
+    throw error;
   }
 }

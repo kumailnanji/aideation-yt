@@ -11,5 +11,16 @@ export const $notes = pgTable("notes", {
 
 export type NoteType = typeof $notes.$inferInsert;
 
+export const $projects = pgTable("projects", {
+  id: serial("id").primaryKey(),
+  projectName: text("project_name").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  userId: text("user_id").notNull(),
+  imageUrl: text("imageUrl"),
+  // Add more fields as necessary for your projects...
+});
+
+export type ProjectType = typeof $projects.$inferInsert;
+
 // drizzle-orm
 // drizzle-kit
