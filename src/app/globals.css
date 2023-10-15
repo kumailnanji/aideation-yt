@@ -87,3 +87,14 @@
   background-color: #dadada;
   border-radius: 2px;
 }
+
+
+/* Treeview Styling */
+
+.PRIVATE_TreeView-item-content-text {
+  font-size: 1rem;
+}
+
+.PRIVATE_TreeView-item-level-line {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}

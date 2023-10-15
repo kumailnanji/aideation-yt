@@ -1,57 +1,67 @@
+// 'use client';
 import CreateNoteDialog from "@/components/CreateNoteDialog";
 import CreateProjectDialog from "@/components/CreateProjectDialog";
 import Create from "@/components/CreateNoteDialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { db } from "@/lib/db";
-import { $notes } from "@/lib/db/schema";
+import { $notes, $projects, $logos } from "@/lib/db/schema";
 import { UserButton, auth } from "@clerk/nextjs";
 import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import React from "react";
 import Sidebar from "@/components/ui/sidebar"
 import { PlusIcon } from '@heroicons/react/20/solid'
+import React, { useState, useEffect } from 'react';
+import Dropdown from "@/components/ui/dropdown"
+
 
 
 type Props = {};
 
-const files = [
-  {
-    title: 'Snakebyte Studios',
-    size: '2 days ago',
-    source:
-      'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=768&h=512&q=80',
-  },
-  {
-    title: 'Shaya Law',
-    size: '6 days ago',
-    source:
-      'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=768&h=512&q=80',
-  },
-  {
-    title: 'Puritech',
-    size: '17 days ago',
-    source:
-      'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=768&h=512&q=80',
-  },
-  {
-    title: 'Kumail Nanji',
-    size: '1 month ago',
-    source:
-      'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=768&h=512&q=80',
-  },
-  {
-    title: 'eShipper',
-    size: '3 months ago',
-    source:
-      'https://images.unsplash.com/photo-1618005198919-d3d4b5a92ead?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=768&h=512&q=80',
-  },
-]
+function timeAgo(createdAt: any) {
+  const now = new Date().getTime(); // Get time in milliseconds
+  const createdDate = new Date(createdAt).getTime(); // Get time in milliseconds
+  const diffInSeconds = Math.floor((now - createdDate) / 1000);
+
+  const mins = Math.floor(diffInSeconds / 60);
+  const hours = Math.floor(mins / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    return `${days} day${days > 1 ? 's' : ''} ago`;
+  } else if (hours > 0) {
+    return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+  } else {
+    return `${mins} minute${mins > 1 ? 's' : ''} ago`;
+  }
+}
 
 const DashboardPage = async (props: Props) => {
+
   const { userId } = auth();
+
+
+
+  // import projects
+  const projects = await db
+    .select()
+    .from($projects)
+    .where(eq($projects.userId, userId!));
+
+  const logoIds = projects.map(p => p.logoId);
+
+  // import logos
+  const logos = await db
+    .select()
+    .from($logos) // Assuming $logos is the logos table or equivalent
+  // .where(eq($logos.id, logoIds));
+  // .where(in($logos.id, logoIds)); // Assuming 'in' is a function to check if id is in the array
+  const relevantLogos = logos.filter(logo => logoIds.includes(logo.id));
+
+
+
   const notes = await db
     .select()
     .from($notes)
@@ -59,8 +69,7 @@ const DashboardPage = async (props: Props) => {
 
   return (
     <div>
-    // <>
-        <div className="grainy min-h-screen">
+      {/* <div className="grainy min-h-screen">
           <div className="max-w-7xl mx-auto p-10">
             <div className="h-14"></div>
             <div className="flex justify-between items-center md:flex-row flex-col">
@@ -81,15 +90,12 @@ const DashboardPage = async (props: Props) => {
             <div className="h-8"></div>
             <Separator />
             <div className="h-8"></div>
-            {/* list all the notes */}
-            {/* if no notes, display this */}
             {notes.length === 0 && (
               <div className="text-center">
                 <h2 className="text-xl text-gray-500">You have no notes yet.</h2>
               </div>
             )}
 
-            {/* display all the notes */}
             <div className="grid sm:grid-cols-3 md:grid-cols-5 grid-cols-1 gap-3">
               <CreateNoteDialog />
               {notes.map((note) => {
@@ -117,8 +123,7 @@ const DashboardPage = async (props: Props) => {
               })}
             </div>
           </div>
-        </div>
-      </>
+        </div> */}
 
       <div className="flex flex-row bg-gray-950  h-screen">
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
@@ -133,7 +138,7 @@ const DashboardPage = async (props: Props) => {
             </div>
 
             {/* If no projects exist */}
-            {files.length === 0 && (
+            {projects.length === 0 && (
 
               <div className="text-center">
                 <svg
@@ -169,25 +174,40 @@ const DashboardPage = async (props: Props) => {
 
             {/* If projects exist */}
             <ul role="list" className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:gap-x-8 ">
-              {files.map((project, index) => (
-                <li key={index} className="relative">
-                  <div className="group aspect-w-10 block w-full overflow-hidden rounded-lg bg-gray-100 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100">
-                    <img src={project.source} alt="" className="pointer-events-none object-cover group-hover:opacity-75" />
-                    <button type="button" className="absolute inset-0 focus:outline-none">
-                      <span className="sr-only">View details for {project.title}</span>
-                    </button>
-                  </div>
-                  <p className="pointer-events-none mt-2 block truncate text-sm font-medium text-gray-300">{project.title}</p>
-                  <p className="pointer-events-none block text-xs font-medium text-gray-500">{project.size}</p>
-                </li>
+              {projects.map((project, index) => (
+                <div>
+                  <li key={index} className="relative">
+                    <Link href={`/project/${project.id}`}> {/* Example route */}
+                      <div className="group min-h-[15vh] w-full overflow-hidden flex items-center reverse justify-center p-10 rounded-lg bg-gray-900 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 hover:translate-y-[-5px] transition duration-100 ease-linear cursor-pointer">
+                        {relevantLogos.filter(logo => logo.id === project.logoId).map((logo, index) => (
+
+                          <img src={logo.whiteLogo!} width={50}></img>
+                        ))}
+                        {/* <img src={project.source} alt="" className="pointer-events-none object-cover group-hover:opacity-75" /> */}
+                        <button type="button" className="absolute inset-0 focus:outline-none">
+                          <span className="sr-only">View details for {project.projectName}</span>
+                        </button>
+                      </div>
+                    </Link>
+                    <div className="flex flex-row justify-between w-full">
+                      <div>
+                        <p className="pointer-events-none mt-2 block truncate text-sm font-large font-semibold text-gray-300">{project.projectName}</p>
+                        <p className="pointer-events-none block text-xs font-medium text-gray-500">Created {timeAgo(project.createdAt)}</p>
+                      </div>
+                      <div>
+                        <Dropdown />
+                      </div>
+                    </div>
+                  </li>
+                </div>
               ))}
             </ul>
             {/* END - If projects exist */}
 
           </div>
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
