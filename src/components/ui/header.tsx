@@ -11,8 +11,16 @@ const navigation = [
     { name: 'Company', href: '#' },
 ]
 
-export default function Header({projectName}:any) {
+interface ShowcaseProps {
+    projectName: number | string,
+    userId: any,
+    projectId: number | string;
+}
+
+export default function Header({projectName, userId, projectId}:ShowcaseProps) {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+    const viewerUserId = userId.slice(5)
 
     return (
         <header className="bg-gray-900 w-screen">
@@ -36,8 +44,9 @@ export default function Header({projectName}:any) {
                 </div>
                 <div className="flex flex-1 items-center justify-end gap-x-6">
                     <a
-                        href="#"
+                        href={`/project/${projectName}?projectId=${projectId}&type=viewer&t=${viewerUserId}`}
                         className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                        target='_blank'
                     >
                         Share
                     </a>

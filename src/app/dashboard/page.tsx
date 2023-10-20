@@ -173,11 +173,21 @@ const DashboardPage = async (props: Props) => {
             {/* END - If no projects exist */}
 
             {/* If projects exist */}
-            <ul role="list" className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-4 xl:gap-x-8 ">
+            <ul role="list" className="grid gap-x-4 gap-y-8 sm:gap-x-6 xl:gap-x-8 grid-cols-[repeat(auto-fill,minmax(272px,1fr))]">
+              {/* 
+                Taken From Figma            
+                  display: grid;
+                  grid-template-columns: repeat(auto-fill,minmax(272px,1fr));
+                  grid-gap: 32px 32px; 
+              */}
               {projects.map((project, index) => (
                 <div>
                   <li key={index} className="relative">
-                    <Link href={`/project/${project.id}`}> {/* Example route */}
+                    <Link href={{
+                      pathname: `/project/${project.projectName}`,
+                      query: { projectId: project.id, type: "editor" }
+                    }}> {/* Example route */}
+                      {/* <Link href={`/project/${project.id}`}>  */}
                       <div className="group min-h-[15vh] w-full overflow-hidden flex items-center reverse justify-center p-10 rounded-lg bg-gray-900 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 hover:translate-y-[-5px] transition duration-100 ease-linear cursor-pointer">
                         {relevantLogos.filter(logo => logo.id === project.logoId).map((logo, index) => (
 

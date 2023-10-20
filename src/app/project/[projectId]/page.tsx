@@ -6,10 +6,11 @@ import { clerk } from "@/lib/clerk-server";
 import { db } from "@/lib/db";
 import { $notes, $projects } from "@/lib/db/schema";
 import { auth } from "@clerk/nextjs";
-import { and, eq } from "drizzle-orm";
+import { SQLWrapper, and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import React from "react";
+import { useState } from "react";
 import { useQuery } from 'react-query';
 import Image from "next/image";
 import Showcase from "@/components/showcase";
@@ -19,28 +20,62 @@ import DirectoryTreeView from "@/components/ui/treeview";
 
 
 type Props = {
-    params: {
+    searchParams: {
         projectId: string;
+        type: string;
+        t: string; //Viewer User Id
     };
 };
 
-const ProjectPage = async ({ params: { projectId } }: Props) => {
+
+
+const ProjectPage = async ({ searchParams: { projectId, type, t } }: Props) => {
+    // const ProjectPage = async ({ params: { projectId } }: Props) => {
     // const [imageSrc, setImageSrc] = useState($projects.imageUrl);
+    // const [viewerMode, setViewerMode] = useState(false);
+    // let userId:any;
+    let viewerMode = false;
+    // const viewerType = type;
 
     // console.log("$projects.imageUrl: ",$projects)
 
-    const { userId } = await auth();
-    if (!userId) {
-        return redirect("/dashboard");
+    // if (type === "editor") {
+    //     viewerMode = false;
+    // } else if (type === "viewer") {
+    //     viewerMode = true;
+    // }
+    let userId;
+    let viewerUserId = "user_" + t;
+        console.log("viewerUserId: ", viewerUserId)
+
+
+    console.log("type-> ", type);
+    // const projectId = id;
+    // console.log(userId)
+    
+    if (type === "editor") {
+        const id = await auth();
+        userId = id.userId
+        console.log("im here")
+        // userId = await auth();
+        // console.log("userId: ", userId)
+        if (!userId) {
+            return redirect("/dashboard");
+            console.log(userId)
+        }
+    } else {
+        viewerMode = true;
     }
-    const user = await clerk.users.getUser(userId);
+
     const projects = await db
         .select()
         .from($projects)
-        .where(and(eq($projects.id, parseInt(projectId)), eq($projects.userId, userId)));
+        .where(and(eq($projects.id, parseInt(projectId)), eq($projects.userId, userId || viewerUserId)));
 
     if (projects.length != 1) {
-        return redirect("/dashboard");
+        // return redirect("/dashboard");
+        console.log(userId)
+
     }
     const project = projects[0];
 
@@ -73,18 +108,26 @@ const ProjectPage = async ({ params: { projectId } }: Props) => {
         //   </div>
         // </div>
         <div className="">
-            <Header projectName={project.projectName} />
+            {viewerMode ? (
+                ""
+            ) :
+            <Header projectName={project.projectName} userId={userId} projectId={projectId} />
+
+            }
+
             <div className="flex overflow-y-hidden">
-                <Sidebar/>
+                {viewerMode ? (
+                    ""
+                ) : <Sidebar />}
                 <div className="showcase w-2/5 h-screen bg-gray-950 ">
-                    <DirectoryTreeView userId={userId} projectName={project.projectName}/>
+                    <DirectoryTreeView userId={userId || viewerUserId} projectName={project.projectName} />
                 </div>
-                <div className="showcase w-2/5">
+                <div className={`showcase ${viewerMode ? "w-3/5" : "w-2/5"}`}>
                     <Showcase projectId={projectId} />
                     {/* <Modal /> */}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
