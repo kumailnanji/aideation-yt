@@ -5,9 +5,11 @@ import Create from "@/components/CreateNoteDialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { db } from "@/lib/db";
-import { $notes, $projects, $logos } from "@/lib/db/schema";
+import { drizzle } from "drizzle-orm/neon-http";
+// import { $projects, $logos, $users, $logo_types, $logo_variants, usersRelations, projectsRelations, logosRelations } from "@/lib/db/schema";
+import * as schema from "@/lib/db/schema"
 import { UserButton, auth } from "@clerk/nextjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,6 +17,7 @@ import Sidebar from "@/components/ui/sidebar"
 import { PlusIcon } from '@heroicons/react/20/solid'
 import React, { useState, useEffect } from 'react';
 import Dropdown from "@/components/ui/dropdown"
+import { getProjects } from "@/lib/db-query";
 
 
 
@@ -41,89 +44,27 @@ function timeAgo(createdAt: any) {
 const DashboardPage = async (props: Props) => {
 
   const { userId } = auth();
+  var logos;
 
+  const projects = await getProjects(userId)
+  const projectIds = projects.map(p => p.id);
 
+  if (projectIds.length > 0) {
+    const projectIdsString = `{${projectIds.join(',')}}`;
+    logos = await db
+      .select()
+      .from(schema.$logos)
+      .where(sql`${schema.$logos.projectId} = ANY(${projectIdsString}::integer[])`);
+  } else {
+    console.log('No projects found for this user.');
+  }
 
-  // import projects
-  const projects = await db
-    .select()
-    .from($projects)
-    .where(eq($projects.userId, userId!));
-
-  const logoIds = projects.map(p => p.logoId);
-
-  // import logos
-  const logos = await db
-    .select()
-    .from($logos) // Assuming $logos is the logos table or equivalent
-  // .where(eq($logos.id, logoIds));
-  // .where(in($logos.id, logoIds)); // Assuming 'in' is a function to check if id is in the array
-  const relevantLogos = logos.filter(logo => logoIds.includes(logo.id));
-
-
-
-  const notes = await db
-    .select()
-    .from($notes)
-    .where(eq($notes.userId, userId!));
+  const whiteMonogramLogos = logos!.filter(logo =>
+    logo.logoTypeId === 1 && logo.logoVariantId === 3
+  );
 
   return (
-    <div>
-      {/* <div className="grainy min-h-screen">
-          <div className="max-w-7xl mx-auto p-10">
-            <div className="h-14"></div>
-            <div className="flex justify-between items-center md:flex-row flex-col">
-              <div className="flex items-center">
-                <Link href="/">
-                  <Button className="bg-green-600" size="sm">
-                    <ArrowLeft className="mr-1 w-4 h-4" />
-                    Back
-                  </Button>
-                </Link>
-                <div className="w-4"></div>
-                <h1 className="text-3xl font-bold text-gray-900">My Notes</h1>
-                <div className="w-4"></div>
-                <UserButton />
-              </div>
-            </div>
-
-            <div className="h-8"></div>
-            <Separator />
-            <div className="h-8"></div>
-            {notes.length === 0 && (
-              <div className="text-center">
-                <h2 className="text-xl text-gray-500">You have no notes yet.</h2>
-              </div>
-            )}
-
-            <div className="grid sm:grid-cols-3 md:grid-cols-5 grid-cols-1 gap-3">
-              <CreateNoteDialog />
-              {notes.map((note) => {
-                return (
-                  <a href={`/notebook/${note.id}`} key={note.id}>
-                    <div className="border border-stone-300 rounded-lg overflow-hidden flex flex-col hover:shadow-xl transition hover:-translate-y-1">
-                      <Image
-                        width={400}
-                        height={200}
-                        alt={note.name}
-                        src={note.imageUrl || ""}
-                      />
-                      <div className="p-4">
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {note.name}
-                        </h3>
-                        <div className="h-1"></div>
-                        <p className="text-sm text-gray-500">
-                          {new Date(note.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                  </a>
-                );
-              })}
-            </div>
-          </div>
-        </div> */}
+    <div className="bg-gray-950">
 
       <div className="flex flex-row bg-gray-950  h-screen">
         <div className="hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col">
@@ -189,9 +130,8 @@ const DashboardPage = async (props: Props) => {
                     }}> {/* Example route */}
                       {/* <Link href={`/project/${project.id}`}>  */}
                       <div className="group min-h-[15vh] w-full overflow-hidden flex items-center reverse justify-center p-10 rounded-lg bg-gray-900 focus-within:ring-2 focus-within:ring-indigo-500 focus-within:ring-offset-2 focus-within:ring-offset-gray-100 hover:translate-y-[-5px] transition duration-100 ease-linear cursor-pointer">
-                        {relevantLogos.filter(logo => logo.id === project.logoId).map((logo, index) => (
-
-                          <img src={logo.whiteLogo!} width={50}></img>
+                        {whiteMonogramLogos.filter(logo => logo.projectId === project.id).map((logo) => (
+                          <img src={logo.url!} alt="logo" key={logo.id} width={50}></img>
                         ))}
                         {/* <img src={project.source} alt="" className="pointer-events-none object-cover group-hover:opacity-75" /> */}
                         <button type="button" className="absolute inset-0 focus:outline-none">
@@ -205,7 +145,7 @@ const DashboardPage = async (props: Props) => {
                         <p className="pointer-events-none block text-xs font-medium text-gray-500">Created {timeAgo(project.createdAt)}</p>
                       </div>
                       <div>
-                        <Dropdown />
+                        <Dropdown projectId={project.id}/>
                       </div>
                     </div>
                   </li>

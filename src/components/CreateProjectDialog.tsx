@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -17,26 +17,36 @@ import { useRouter } from "next/navigation";
 import { PlusIcon, PhotoIcon } from '@heroicons/react/20/solid'
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { generateBWVersions } from '@/lib/svgColorChanger'
-import { fileToSVGString } from "@/lib/svgProcessor";
+import { extractSVGColors, generateAllVersions } from '@/lib/svgColorChanger'
+import { filesToSVGStrings } from "@/lib/svgProcessor";
 import { clerk } from "@/lib/clerk-server";
 import { auth } from "@clerk/nextjs";
 import { useUser } from "@clerk/clerk-react";
+import FileUpload from "./ui/fileUpload";
+import { $projects, $colors, $logos, $logo_types } from "@/lib/db/schema";
+import { db } from "@/lib/db";
 // import generatePNG from "@/lib/sharp"
 // const sharp = require('sharp');
 
 
 type Props = {};
 
+// type CreateProjectData = {
+//   projectName: string;
+//   originalUrl: string;
+//   blackUrl: string;
+//   whiteUrl: string;
+//   color: any;
+// };
+
 type CreateProjectData = {
   projectName: string;
-  originalUrl: string;
-  blackUrl: string;
-  whiteUrl: string;
-  color: any;
+  urls: Record<string, string>;
+  colors: any;
 };
 
 const createProject = async (data: CreateProjectData) => {
+  console.log("data", data)
   const response = await fetch('/api/createProject', {
     method: 'POST',
     headers: {
@@ -54,14 +64,21 @@ const CreateProjectDialog: React.FC<Props> = (props: Props) => {
   const router = useRouter();
   const [input, setInput] = useState<string>("");
   const [file, setFile] = useState<File | null>(null);
+  // const [files, setFiles] = useState<any>([]);
+  const [files, setFiles] = useState<{ file: File, logoType: string }[]>([]);
+  const [fileTypeMapping, setFileTypeMapping] = useState<Record<string, string>>({});
   const [color, setOriginalColor] = useState<any>("");
   const userId = useUser().user?.id
+
+  useEffect(() => {
+    console.log("fileTypeMapping", fileTypeMapping);
+  }, [fileTypeMapping]);
 
 
   const createProjectMutation = useMutation(createProject, {
     onSuccess: (data) => {
       console.log("created new project:", data);
-      router.push(`/project/${data.project_id}`);
+      router.push(`/project/${data.projectName}?projectId=${data.projectId}&type=editor`);
     },
     onError: (error) => {
       console.error('There was a problem with the fetch operation:', error);
@@ -84,54 +101,55 @@ const CreateProjectDialog: React.FC<Props> = (props: Props) => {
 
     e.preventDefault();
 
-    if (!file) {
+    if (!files) {
       window.alert("Please select a file to upload");
       return;
     }
 
     try {
-      const svgString = await fileToSVGString(file);
-      console.log(svgString);
+      // const svgString = await fileToSVGString(file);
+      // const svgString = "await filesToSVGStrings(files)";
+      const svgString = await filesToSVGStrings(files);
+      console.log("svgString", svgString);
 
       // Generate black and white versions
-      const { original, black, white, extractedColor } = await generateBWVersions(svgString);
+      const versions = await generateAllVersions(svgString) as Record<string, string>;
 
-      // const { userId } = auth();
-      setOriginalColor(extractedColor);
+      console.log("versions-------------->", versions)
 
-      const uploadSVGAndGetURL = async (svgContent: BlobPart, version: VersionType, type: FileType) => {
+      // Extract colors from full_logo version
+      const colors = await extractSVGColors(svgString["Full Logo"] || svgString["Monogram"]);
+      console.log(colors); // Log the extracted colors
+
+      const uploadSVGAndGetURL = async (svgContent: BlobPart, category: string, version: VersionType, type: FileType) => {
         const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-        const storageRef = ref(storage, `${userId}/${input}/${version}_icon.${type}`);
+        // const storageRef = ref(storage, `${userId}/${input}/${version}_icon.${type}`);
+        const storageRef = ref(storage, `${userId}/${input}/${category}/${version}_${category.toLowerCase()}.${type}`);
         await uploadBytes(storageRef, blob);
         return await getDownloadURL(storageRef);
       };
 
-      // const uploadPNGandGetURL = async (pngContent: Buffer, version: VersionType, type: FileType) => {
-      //   // const blob = new Blob([pngContent], { type: 'image/png' });
-      //   const storageRef = ref(storage, `${userId}/${input}/${version}_icon.${type}`);
-      //   await uploadBytes(storageRef, pngContent);
-      //   return await getDownloadURL(storageRef);
-      // };
+      const uploadSVGsAndGetURLs = async (versions: Record<string, string>) => {
+        let urls: Record<string, string> = {};
 
-      // // const orignalPNG = await sharp(Buffer.from(original)).toFile('original.png');
-      // const originalPNGBuffer = await sharp(Buffer.from(original)).toBuffer();
+        for (let [combinedKey, svgContent] of Object.entries(versions)) {
+          // Split the combinedKey to get category and version
+          const [category, version] = combinedKey.split('_');
 
-      // const originalPngURL = await uploadPNGandGetURL(originalPNGBuffer, 'original', 'png');
-      // console.log("originalPngURL: ", originalPngURL);
+          urls[combinedKey] = await uploadSVGAndGetURL(svgContent, category, version as VersionType, 'svg');
+        }
 
+        return urls;
+      };
 
       // Upload SVGs and get URLs
-      const originalUrl = await uploadSVGAndGetURL(original, 'original', 'svg');
-      const blackUrl = await uploadSVGAndGetURL(black, 'black', 'svg');
-      const whiteUrl = await uploadSVGAndGetURL(white, 'white', 'svg');
+      const urls = await uploadSVGsAndGetURLs(versions);
 
-      console.log("color ", extractedColor)
+      // console.log("color ", extractedColor)
       await createProjectMutation.mutateAsync({
         projectName: input,
-        originalUrl,  // Include the SVG URLs
-        blackUrl,
-        whiteUrl,
-        color: extractedColor
+        urls: urls,
+        colors: colors
       });
 
 
@@ -149,6 +167,45 @@ const CreateProjectDialog: React.FC<Props> = (props: Props) => {
       setFile(e.target.files[0]);
     }
   };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const totalFiles = files.length + e.target.files!.length;
+
+    if (totalFiles > 3) {
+      window.alert("You can only upload up to 3 files. Please remove some files");
+      return;
+    }
+
+    const newFiles = Array.from(e.target.files!).map(f => ({
+      file: f,
+      logoType: `${f.name.split('.')[0]}-wordmark.svg` // default mapping, can be updated by the user
+    }));
+
+    setFiles(prevFiles => [...prevFiles, ...newFiles]);
+  }
+  function handleFileTypesSelected(fileName: string, logoType: string) {
+    setFiles(prevFiles => {
+      return prevFiles.map(fileEntry => {
+        if (fileEntry.file.name === fileName) {
+          return {
+            ...fileEntry,
+            logoType: logoType
+          };
+        }
+        return fileEntry;
+      });
+    });
+  }
+
+  const handleDeleteFile = (fileName: string) => {
+    const updatedFiles = files.filter((file: any) => file.file.name !== fileName);
+    setFiles(updatedFiles);
+
+    // Remove the file type mapping for the deleted file
+    const updatedMapping = { ...fileTypeMapping };
+    delete updatedMapping[fileName];
+    setFileTypeMapping(updatedMapping);
+  }
 
   return (
     <Dialog>
@@ -177,47 +234,26 @@ const CreateProjectDialog: React.FC<Props> = (props: Props) => {
           />
           <div className="col-span-full">
             <label htmlFor="cover-photo" className="block text-sm font-medium leading-6 text-gray-300 my-2">
-              Logo Icon
+              Logo Upload
             </label>
-            {/* <div className="mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">
-              <div className="text-center">
-                <PhotoIcon className="mx-auto h-12 w-12 text-gray-300" aria-hidden="true" />
-                <div className="mt-4 flex text-sm leading-6 text-gray-600">
-                  <label
-                    htmlFor="file-upload"
-                    className="relative cursor-pointer rounded-md bg-white font-semibold text-indigo-600 focus-within:outline-none focus-within:ring-2 focus-within:ring-indigo-600 focus-within:ring-offset-2 hover:text-indigo-500"
-                  >
-                    <span>Upload a file</span>
-                    <input
-                      onChange={handleFileChange}
-                      id="file-upload"
-                      name="file-upload"
-                      type="file"
-                      className="sr-only"
-                      accept=".svg"
-                    />
-                  </label>
-                  <p className="pl-1">or drag and drop</p>
-                </div>
-                <p className="text-xs leading-5 text-gray-600">SVG files only</p>
-              </div>
-            </div> */}
             <div className="flex items-center justify-center w-full">
-              <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-64 border-2 border-gray-700 border-dashed rounded-lg cursor-pointer bg-gray-800 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
+              <label htmlFor="dropzone-file" className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-700 border-dashed rounded-lg cursor-pointer bg-gray-800 dark:hover:bg-bray-800 dark:bg-gray-700 hover:bg-gray-700 dark:border-gray-600 dark:hover:border-gray-500 dark:hover:bg-gray-600">
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
                   <svg className="w-8 h-8 mb-4 text-gray-500 dark:text-gray-400" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
+                    <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2" />
                   </svg>
                   <p className="mb-2 text-sm text-gray-500 dark:text-gray-500"><span className="font-semibold text-indigo-500">Click to upload</span> or drag and drop</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-500">SVG files only</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-500">SVG files only. Max 3 files</p>
                 </div>
-                <input id="dropzone-file" type="file" className="hidden" onChange={handleFileChange}
+                <input id="dropzone-file" type="file" multiple={true} className="hidden" onChange={handleFile}
                   name="file-upload"
                   accept=".svg" />
-                <p className="text-sm text-gray-400">{file?.name}</p>
+                {/* <p className="text-sm text-gray-400">{file?.name}</p> */}
               </label>
             </div>
           </div>
+          {files ? <FileUpload onDeleteFile={handleDeleteFile} onFileTypesSelected={handleFileTypesSelected} files={files} /> : ""}
+
           <div className="h-4"></div>
           <div className="flex gap-2">
             <Button type="reset" variant={"ghost"} className="text-gray-500">
@@ -238,8 +274,8 @@ const CreateProjectDialog: React.FC<Props> = (props: Props) => {
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </DialogContent >
+    </Dialog >
   );
 };
 

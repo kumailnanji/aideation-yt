@@ -4,7 +4,7 @@ import TipTapEditor from "@/components/TipTapEditor";
 import { Button } from "@/components/ui/button";
 import { clerk } from "@/lib/clerk-server";
 import { db } from "@/lib/db";
-import { $notes, $projects } from "@/lib/db/schema";
+import { $projects } from "@/lib/db/schema";
 import { auth } from "@clerk/nextjs";
 import { SQLWrapper, and, eq } from "drizzle-orm";
 import Link from "next/link";
@@ -17,11 +17,13 @@ import Showcase from "@/components/showcase";
 import Header from "@/components/ui/header";
 import Sidebar from "@/components/ui/sidebar";
 import DirectoryTreeView from "@/components/ui/treeview";
+import ShareButton from "@/components/ui/shareButton";
+import ProjectSidebar from "@/components/ui/projectSidebar";
 
 
 type Props = {
     searchParams: {
-        projectId: string;
+        projectId: number;
         type: string;
         t: string; //Viewer User Id
     };
@@ -30,6 +32,8 @@ type Props = {
 
 
 const ProjectPage = async ({ searchParams: { projectId, type, t } }: Props) => {
+    console.log("projectId", type)
+
     // const ProjectPage = async ({ params: { projectId } }: Props) => {
     // const [imageSrc, setImageSrc] = useState($projects.imageUrl);
     // const [viewerMode, setViewerMode] = useState(false);
@@ -46,17 +50,16 @@ const ProjectPage = async ({ searchParams: { projectId, type, t } }: Props) => {
     // }
     let userId;
     let viewerUserId = "user_" + t;
-        console.log("viewerUserId: ", viewerUserId)
+    console.log("viewerUserId: ", viewerUserId)
 
 
     console.log("type-> ", type);
     // const projectId = id;
     // console.log(userId)
-    
+
     if (type === "editor") {
         const id = await auth();
         userId = id.userId
-        console.log("im here")
         // userId = await auth();
         // console.log("userId: ", userId)
         if (!userId) {
@@ -70,7 +73,7 @@ const ProjectPage = async ({ searchParams: { projectId, type, t } }: Props) => {
     const projects = await db
         .select()
         .from($projects)
-        .where(and(eq($projects.id, parseInt(projectId)), eq($projects.userId, userId || viewerUserId)));
+        .where(and(eq($projects.id, projectId), eq($projects.userId, userId || viewerUserId)));
 
     if (projects.length != 1) {
         // return redirect("/dashboard");
@@ -80,49 +83,26 @@ const ProjectPage = async ({ searchParams: { projectId, type, t } }: Props) => {
     const project = projects[0];
 
     return (
-        // <div className="min-h-screen grainy p-8">
-        //   <div className="max-w-4xl mx-auto">
-        //     <div className="border shadow-xl border-stone-200 rounded-lg p-4 flex items-center">
-        //       <Link href="/dashboard">
-        //         <Button className="bg-green-600" size="sm">
-        //           Back
-        //         </Button>
-        //       </Link>
-        //       <div className="w-3"></div>
-        //       <span className="font-semibold">
-        //         {user.firstName} {user.lastName}
-        //       </span>
-        //       <span className="inline-block mx-1">/</span>
-        //       <span className="text-stone-500 font-semibold">{project.projectName}</span>
-        //       <img src={project.imageUrl!} alt="logo" className="fill-black"/>
+        <div className="flex flex-col min-h-screen overflow-y-clip ">
+            <div className={`flex  ${viewerMode ? "h-0" : "h-[8vh]"}`}>
+                {viewerMode ? (
+                   ""
+                ) :
+                    <Header projectName={project.projectName} userId={userId} projectId={projectId} type={"editor"} />
 
-        //       {/* <div className="ml-auto">
-        //         <DeleteButton noteId={project.id} />
-        //       </div> */}
-        //     </div>
+                }
+            </div>
 
-        //     <div className="h-4"></div>
-        //     {/* <div className="border-stone-200 shadow-xl border rounded-lg px-16 py-8 w-full">
-        //       <TipTapEditor note={project} />
-        //     </div> */}
-        //   </div>
-        // </div>
-        <div className="">
-            {viewerMode ? (
-                ""
-            ) :
-            <Header projectName={project.projectName} userId={userId} projectId={projectId} />
-
-            }
-
-            <div className="flex overflow-y-hidden">
+            <div className={`relative flex flex-grow sm:flex-row flex-col  ${viewerMode ? "h-[100vh]" : "h-[92vh]"}`}>
                 {viewerMode ? (
                     ""
-                ) : <Sidebar />}
-                <div className="showcase w-2/5 h-screen bg-gray-950 ">
+                ) : <div className="max-h-screen flex flex-grow w-fit flex-1">
+                    <ProjectSidebar />
+                </div>}
+                <div className="tree max-h-screen flex-2 sm:w-2/5 w-full sm:overflow-y-auto bg-gray-950">
                     <DirectoryTreeView userId={userId || viewerUserId} projectName={project.projectName} />
                 </div>
-                <div className={`showcase ${viewerMode ? "w-3/5" : "w-2/5"}`}>
+                <div className={`showcase max-h-screen flex-3 flex-grow overflow-y-scroll ${viewerMode ? "w-full sm:w-3/5" : "w-2/5"}`}>
                     <Showcase projectId={projectId} />
                     {/* <Modal /> */}
                 </div>

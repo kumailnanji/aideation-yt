@@ -2,15 +2,49 @@
 import { Menu, Transition } from '@headlessui/react'
 import { Fragment, JSX, SVGProps, useEffect, useRef, useState } from 'react'
 import { ChevronDownIcon, EllipsisVerticalIcon } from '@heroicons/react/20/solid'
+import router, { useRouter } from 'next/navigation';
+import { useMutation } from "@tanstack/react-query";
+import axios from 'axios';
 
-export default function Dropdown() {
+// const handleDeleteProject = async (projectId: string) => {
+//   console.log("Deleting project with ID:", projectId)
+
+//   const response = await fetch(`/api/deleteProject`, {
+//     method: 'DELETE',
+//     headers: {
+//       'Content-Type': 'application/json',
+//     },
+//   });
+
+//   if (!response.ok) {
+//     throw new Error('Network response was not ok');
+//   }
+//   return response.json();
+// };
+
+type Props = {
+    projectId: number;
+};
+
+
+const Dropdown = ({ projectId }: Props) => {
+  const router = useRouter();
+
+  const deleteProject = useMutation({
+    mutationFn: async () => {
+      const response = await axios.post("/api/deleteProject", {
+        projectId,
+      });
+      return response.data;
+    },
+  });
   return (
     <div className="text-right z-50">
       <Menu as="div" className="relative inline-block text-left">
         <div>
           <Menu.Button className="inline-flex w-full justify-center rounded-md bg-black bg-opacity-20 py-2 text-sm font-medium text-white hover:bg-opacity-30 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75">
             <EllipsisVerticalIcon className="cursor-pointer ml-2 -mr-1 h-5 w-5 text-gray-600 hover:text-gray-500"
-              aria-hidden="true"/>
+              aria-hidden="true" />
             {/* <ChevronDownIcon
               className="ml-2 -mr-1 h-5 w-5 text-violet-200 hover:text-violet-100"
               aria-hidden="true"
@@ -26,14 +60,13 @@ export default function Dropdown() {
           leaveFrom="transform opacity-100 scale-100"
           leaveTo="transform opacity-0 scale-95"
         >
-          <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-100 rounded-md bg-white z-50 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+          <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right divide-y divide-gray-800 rounded-md bg-gray-900 z-50 shadow-xl ring-1 ring-black ring-opacity-5 focus:outline-none">
             <div className="px-1 py-1 ">
               <Menu.Item>
                 {({ active }) => (
                   <button
-                    className={`${
-                      active ? 'bg-violet-500 text-white' : 'text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    className={`${active ? 'bg-indigo-500 text-gray-300' : 'text-gray-300'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {active ? (
                       <EditActiveIcon
@@ -53,9 +86,8 @@ export default function Dropdown() {
               <Menu.Item>
                 {({ active }) => (
                   <button
-                    className={`${
-                      active ? 'bg-violet-500 text-white' : 'text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    className={`${active ? 'bg-indigo-500 text-gray-300' : 'text-gray-300'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {active ? (
                       <DuplicateActiveIcon
@@ -77,9 +109,8 @@ export default function Dropdown() {
               <Menu.Item>
                 {({ active }) => (
                   <button
-                    className={`${
-                      active ? 'bg-violet-500 text-white' : 'text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    className={`${active ? 'bg-indigo-500 text-gray-300' : 'text-gray-300'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {active ? (
                       <ArchiveActiveIcon
@@ -99,9 +130,8 @@ export default function Dropdown() {
               <Menu.Item>
                 {({ active }) => (
                   <button
-                    className={`${
-                      active ? 'bg-violet-500 text-white' : 'text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    className={`${active ? 'bg-indigo-500 text-gray-300' : 'text-gray-300'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {active ? (
                       <MoveActiveIcon
@@ -123,9 +153,22 @@ export default function Dropdown() {
               <Menu.Item>
                 {({ active }) => (
                   <button
-                    className={`${
-                      active ? 'bg-red-500 text-white' : 'text-gray-900'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                    onClick={() => {
+                      const confirm = window.confirm(
+                        "Are you sure you want to delete this note?"
+                      );
+                      if (!confirm) return;
+                      deleteProject.mutate(undefined, {
+                        onSuccess: () => {
+                          router.refresh();
+                        },
+                        onError: (err: any) => {
+                          console.error(err);
+                        },
+                      });
+                    }}
+                    className={`${active ? 'bg-red-500 text-gray-300' : 'text-gray-300'
+                      } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
                   >
                     {active ? (
                       <DeleteActiveIcon
@@ -149,6 +192,9 @@ export default function Dropdown() {
     </div>
   )
 }
+
+export default Dropdown;
+
 
 function EditInactiveIcon(props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) {
   return (

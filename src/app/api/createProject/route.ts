@@ -1,53 +1,87 @@
 import { db } from "@/lib/db";
-import { $projects, $logos } from "@/lib/db/schema"; // Assuming $logos is the table/schema for logos
+import { $projects, $logos, $logo_types, $logo_variants, $colors } from "@/lib/db/schema";
 import { auth } from "@clerk/nextjs";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export const runtime = "edge";
 
 export async function POST(req: Request) {
-    const { userId } = auth();
-    if (!userId) {
-      return new NextResponse("unauthorised", { status: 401 });
+  const { userId } = auth();
+  if (!userId) {
+    return new NextResponse("unauthorised", { status: 401 });
+  }
+
+  const body = await req.json();
+  console.log("body ", body);
+
+  // 1. Insert into projects table
+  const insertedProject = await db
+    .insert($projects)
+    .values({
+      projectName: body.projectName,
+      userId: userId
+    })
+    .returning({
+      projectId: $projects.id
+    });
+
+  const projectId = insertedProject[0].projectId;
+
+  for (let logoTypeKey in body.urls) {
+    // Extract the logo type and color variant from the key (e.g., "Full Logo_black" -> "Full Logo", "black")
+    const [logoType, colorVariant] = logoTypeKey.split("_");
+
+    const logoTypeRows = await db
+      .select({ logoTypeId: $logo_types.id })
+      .from($logo_types)
+      .where(sql`${$logo_types.name} = ${logoType}`)
+      .limit(1);
+
+    if (logoTypeRows.length === 0) {
+      console.error(`No logo type found for "${logoType}"`);
+      continue;
     }
-    
-    const body = await req.json();
-    const { projectName, originalUrl, blackUrl, whiteUrl, color } = body;
-    console.log("body ",body)
-  
-    // First, save the SVG URLs into the logos table
-    const insertedLogos = await db
+
+    const { logoTypeId } = logoTypeRows[0];
+
+    const logoVariantRows = await db
+      .select({ logoVariantId: $logo_variants.id })
+      .from($logo_variants)
+      .where(sql`${$logo_variants.color} = ${colorVariant}`)
+      .limit(1);
+
+    if (logoVariantRows.length === 0) {
+      console.error(`No logo variant found for "${colorVariant}"`);
+      continue;
+    }
+
+    const { logoVariantId } = logoVariantRows[0];
+
+
+    await db
       .insert($logos)
       .values({
-        originalLogo: originalUrl,
-        blackLogo: blackUrl,
-        whiteLogo: whiteUrl
-      })
-      .returning({
-        logoId: $logos.id
+        url: body.urls[logoTypeKey],
+        projectId: projectId,
+        logoTypeId: logoTypeId,
+        logoVariantId: logoVariantId
       });
-    
-    const logoId = insertedLogos[0].logoId; // Get the id of the inserted logo
-    
-    // console.log('project.color',color)
-  
-    // Now, insert into the projects table with the captured logoId
-    const project_ids = await db
-      .insert($projects)
-      .values({
-        projectName,
-        userId,
-        logoId,
-        color, // Assign the logoId here
-        // ... other fields if you have them
-      })
-      .returning({
-        insertedId: $projects.id,
-      });
-  
-    const projectId = project_ids[0].insertedId;
-  
-    return NextResponse.json({
-      project_id: projectId,
-    });
   }
+
+  for (let color of body.colors) {
+    await db
+      .insert($colors)
+      .values({
+        hexCode: color,
+        projectId: projectId
+      });
+  }
+
+
+
+  return NextResponse.json({
+    projectName: body.projectName.replace(/ /g, ''),
+    projectId: projectId
+  });
+}

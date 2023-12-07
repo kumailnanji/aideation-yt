@@ -1,10 +1,9 @@
-// 'use client';
+'use client';
 import {
     CalendarIcon, ChartPieIcon, DocumentDuplicateIcon, FolderIcon, HomeIcon, UsersIcon
 } from '@heroicons/react/24/outline'
-import { UserButton, auth } from "@clerk/nextjs";
+import { UserButton, auth, useUser} from "@clerk/nextjs";
 import { db } from "@/lib/db";
-import { $notes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
 const navigation = [
@@ -28,13 +27,10 @@ function classNames(...classes: string[]) {
 type Props = {};
 
 
-const Sidebar = async (props: Props) => {
+const Sidebar = (props: Props) => {
     // const { data: session } = useSession();
-    const { userId } = auth();
-    // const notes = await db
-    //     .select()
-    //     .from($notes)
-    //     .where(eq($notes.userId, userId!));
+    // const { userId } = auth();
+    const { isLoaded, isSignedIn, user } = useUser();
 
     return (
         <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-900 px-6 h-screen">
@@ -96,7 +92,8 @@ const Sidebar = async (props: Props) => {
                     </li>
                     <li className="-mx-6 mt-auto">
                         <div className="flex items-center gap-x-4 px-6 py-3 text-sm font-semibold leading-6 text-white">
-                            <UserButton  />
+                            <UserButton />
+                            <p className='font-medium'>{user?.fullName}</p>
                         </div>
                     </li>
                 </ul>

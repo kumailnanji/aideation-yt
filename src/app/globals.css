@@ -70,6 +70,7 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -97,4 +98,24 @@
 
 .PRIVATE_TreeView-item-level-line {
   border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/*  File Upload */
+@keyframes progressBar {
+  0% {
+    background-size: 0% 100%;
+  }
+
+  100% {
+    background-size: 100% 100%;
+  }
+}
+
+.progressBarAnimation {
+  background: linear-gradient(to right, #4CAF50 50%, transparent 50%);
+  background-size: 0% 100%;
+  animation: progressBar 1s forwards;
+}
+.PRIVATE_TreeView-item-content:nth-child(2) {
+  align-items: start !important;
 }

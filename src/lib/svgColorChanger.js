@@ -13,15 +13,10 @@ const setColorInStyle = (style, color) => {
 };
 
 export const changeSVGColor = async (svgContent, color) => {
-  // Parse the SVG content string into a JS object
   const svg = await promisifiedParseString(svgContent);
-
-  // Modify the color of elements using style tags
   if (svg?.svg?.defs && svg.svg.defs[0]?.style) {
     svg.svg.defs[0].style[0] = setColorInStyle(svg.svg.defs[0].style[0], color);
   }
-
-  // Check and change colors in paths
   if (svg?.svg?.path) {
     svg.svg.path.forEach((path) => {
       if (path.$.fill && path.$.fill !== "none") {
@@ -35,55 +30,56 @@ export const changeSVGColor = async (svgContent, color) => {
       }
     });
   }
-
-  // Convert the modified SVG JS object back to string representation
   const builder = new Builder();
   return builder.buildObject(svg);
 };
 
-export const generateBWVersions = async (svgContent) => {
-  const blackVersion = await changeSVGColor(svgContent, "#000000");
-  const whiteVersion = await changeSVGColor(svgContent, "#FFFFFF");
-  const extractedColor = await extractSVGColors(svgContent);
-  //   console.log("extractedColor", extractedColor)
+export const generateAllVersions = async (svgMapping) => {
+  const keys = Object.keys(svgMapping);
+  let results = {};
 
-  return {
-    original: svgContent,
-    black: blackVersion,
-    white: whiteVersion,
-    extractedColor: extractedColor,
-  };
+  for (let key of keys) {
+    results[`${key}_white`] = await changeSVGColor(svgMapping[key], "#FFFFFF");
+    results[`${key}_black`] = await changeSVGColor(svgMapping[key], "#000000");
+    results[`${key}_color`] = svgMapping[key];  // original color version
+  }
+  
+  return results;
 };
 
 export const extractSVGColors = async (svgContent) => {
   const svg = await promisifiedParseString(svgContent);
-  let colors = new Set(); // Using a Set ensures unique values
+  let colors = [];
 
   const collectColorsFromStyle = (style) => {
     const fillMatches = style.match(/fill:([^;]+);/);
     const strokeMatches = style.match(/stroke:([^;]+);/);
 
     if (fillMatches && fillMatches[1] && fillMatches[1] !== "none") {
-      colors.add(fillMatches[1]);
+      addUniqueColor(fillMatches[1]);
     }
     if (strokeMatches && strokeMatches[1]) {
-      colors.add(strokeMatches[1]);
+      addUniqueColor(strokeMatches[1]);
     }
   };
 
-  // Collect colors from style tags
+  const addUniqueColor = (color) => {
+    if (!colors.includes(color)) {
+      colors.push(color);
+    }
+  };
+
   if (svg?.svg?.defs && svg.svg.defs[0]?.style) {
     collectColorsFromStyle(svg.svg.defs[0].style[0]);
   }
 
-  // Collect colors from paths
   if (svg?.svg?.path) {
     svg.svg.path.forEach((path) => {
       if (path.$.fill && path.$.fill !== "none") {
-        colors.add(path.$.fill);
+        addUniqueColor(path.$.fill);
       }
       if (path.$.stroke) {
-        colors.add(path.$.stroke);
+        addUniqueColor(path.$.stroke);
       }
       if (path.$.style) {
         collectColorsFromStyle(path.$.style);
@@ -91,17 +87,8 @@ export const extractSVGColors = async (svgContent) => {
     });
   }
 
-  //   // Convert the Set back to an array
-  //   return Array.from(colors).filter((color) =>
-  //     /^#[0-9A-Fa-f]{3,6}$/.test(color)
-  //   );
-
-  // Filter the Set in-place to retain only hex color values
-  for (let color of colors) {
-    if (!/^#[0-9A-Fa-f]{3,6}$/.test(color)) {
-      colors.delete(color);
-    }
-  }
+  colors = colors.filter(color => /^#[0-9A-Fa-f]{3,6}$/.test(color));
 
   return colors;
 };
+
